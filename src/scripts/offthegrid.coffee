@@ -8,12 +8,13 @@
 #   FACEBOOK_ACCESS_TOKEN
 #
 # Commands:
-#   hubot offthegrid
+#   hubot (offthegrid|otg)
 #
 # Author:
 #   aoiwelle
 otg_id = '129511477069092'
 ROW_STRING = '\n' + ('=' for x in [1..40]).join('') + '\n'
+TITLE_SEPARATOR =  ('-' for x in [1..40]).join('')
 class TruckEvent
   constructor: (eventListing, msg, callback) ->
     @name = eventListing.name
@@ -23,15 +24,14 @@ class TruckEvent
     msg.http(url)
     .query(access_token: process.env.FACEBOOK_ACCESS_TOKEN)
     .get() (err, res, body) =>
-      descr = JSON.parse(body).description unless err
-      @description = descr
+      @description = JSON.parse(body).description unless err
       callback()
   start:
     @start
   description:
     @description
 module.exports = (robot) ->
-  robot.respond /offthegrid/i, (msg) ->
+  robot.respond /(offthegrid|otg)/i, (msg) ->
     d = new Date()
     msg.http("https://graph.facebook.com/#{otg_id}/events")
     .query(access_token: process.env.FACEBOOK_ACCESS_TOKEN)
@@ -45,12 +45,14 @@ module.exports = (robot) ->
         outstandingCallbacks -= 1
         if outstandingCallbacks == 0
           items = testme[d.toDateString()]
-          descriptionString = (item.description.replace(/^\s*/g,'') for item in items)
+          return msg.send 'No Trucks today' if typeof items == 'undefined' || items.length == 0
+          descriptionString = ([item.name, TITLE_SEPARATOR, item.description.replace(/^\s*/g,'')].join('\n') for item in items)
           descriptionString = descriptionString.join('\n'+ROW_STRING+'\n')
           msg.send "Today:\n#{descriptionString}"
       for event_data in graph_data.data
         outstandingCallbacks += 1
         event = new TruckEvent(event_data, msg, callback)
+        continue if event.start.toTimeString() > '15' || event.start.toTimeString() < '10'
         unless testme[event.start.toDateString()]
           testme[event.start.toDateString()] = []
         testme[event.start.toDateString()].push event
